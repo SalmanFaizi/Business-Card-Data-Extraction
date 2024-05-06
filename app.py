@@ -7,7 +7,8 @@ import streamlit as st
 import numpy as np
 
 
-api_key = st.secrets["api_key"]
+
+api_key = st.secrets["huggingface"]["token"]
 
 # Load the EasyOCR reader
 reader = easyocr.Reader(['en'])
