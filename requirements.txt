@@ -1,0 +1,6 @@
+streamlit==0.88.0
+easyocr==1.4.1
+opencv-python==4.5.3.56
+requests==2.26.0
+Pillow==8.4.0
+numpy==1.21.3
