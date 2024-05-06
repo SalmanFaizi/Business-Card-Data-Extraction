@@ -6,11 +6,14 @@ from PIL import Image
 import streamlit as st
 import numpy as np
 
+
+api_key = st.secrets["huggingface"]["token"]
+
 # Load the EasyOCR reader
 reader = easyocr.Reader(['en'])
 
 API_URL = "https://api-inference.huggingface.co/models/flair/ner-english-large"
-headers = {"Authorization": "Bearer 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"}
+headers = {"Authorization": "Bearer {api_key}"}
 
 ## Image uploading function ##
 def image_upload_and_ocr(reader, uploaded_file):
