@@ -8,7 +8,7 @@ import numpy as np
 
 
 
-api_key = st.secrets["api_key"]
+api_key = st.secrets[api_key]
 
 # Load the EasyOCR reader
 reader = easyocr.Reader(['en'])
