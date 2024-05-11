@@ -137,12 +137,12 @@ uploaded_file = st.file_uploader(label="Please upload a business card", type=['j
 
 if uploaded_file is not None:
     res2, res, image = image_upload_and_ocr(reader, uploaded_file)
-    st.write(res) ## added to check
+    # st.write(res) ## added to check
     if res2 and res is not None:
         drawing_image = drawing_detection(res2, image)
 
         output = query({"inputs": res})  # Perform NER
-        st.write(output) # for testing purpose
+        # st.write(output) # for testing purpose
 
         if output:
             named_entities = get_ner_from_transformer(output)
