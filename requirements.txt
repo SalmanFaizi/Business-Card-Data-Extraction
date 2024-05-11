@@ -1,8 +1,7 @@
 streamlit
 easyocr
-opencv-python==4.5.3.56
+opencv-python
 requests
 Pillow
-numpy
 regex
 transformers
