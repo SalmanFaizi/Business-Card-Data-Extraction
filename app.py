@@ -142,6 +142,7 @@ if uploaded_file is not None:
         drawing_image = drawing_detection(res2, image)
 
         output = query({"inputs": res})  # Perform NER
+        st.write(output) # for testing purpose
 
         if output:
             entity_type, named_entities = get_ner_from_transformer(output)
