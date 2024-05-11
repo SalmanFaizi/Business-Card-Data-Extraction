@@ -5,18 +5,14 @@ import re
 from PIL import Image
 import streamlit as st
 import numpy as np
-
-
-
-# api_key = st.secrets[api_key]
-api_key = st.secrets["api_key"]
-
+import pandas as pd
 
 # Load the EasyOCR reader
 reader = easyocr.Reader(['en'])
 
 API_URL = "https://api-inference.huggingface.co/models/flair/ner-english-large"
-headers = {"Authorization": "Bearer {api_key}"}
+api_key = st.secrets.get("api_key")
+headers = {"Authorization": f"Bearer {api_key}"}
 
 ## Image uploading function ##
 def image_upload_and_ocr(reader, uploaded_file):
@@ -34,22 +30,33 @@ def image_upload_and_ocr(reader, uploaded_file):
         return None, None, None
 
 def query(payload):
-    response = requests.post(API_URL, headers=headers, json=payload)
-    return response.json()
+    try:
+        response = requests.post(API_URL, headers=headers, json=payload)
+        if response.status_code == 200:
+            return response.json()
+        else:
+            st.error("Failed to get response from the API. Please try again later.")
+            return None
+    except Exception as e:
+        st.error(f"An error occurred: {str(e)}")
+        return None
 
 def get_ner_from_transformer(output):
-    data = output
-    named_entities = {}
-    for entity in data:
-        entity_type = entity['entity_group']
-        entity_text = entity['word']
+    if output:
+        data = output
+        named_entities = {}
+        for entity in data:
+            entity_type = entity['entity_group']
+            entity_text = entity['word']
+            
+            if entity_type not in named_entities:
+                named_entities[entity_type] = []
+            
+            named_entities[entity_type].append(entity_text)
         
-        if entity_type not in named_entities:
-            named_entities[entity_type] = []
-        
-        named_entities[entity_type].append(entity_text)
-    
-    return entity_type, named_entities
+        return named_entities
+    else:
+        return None
 
 def drawing_detection(res2, image):
     cv2_image = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
@@ -122,7 +129,6 @@ def extract_pin_code(text):
     else:
         return None
 
-import pandas as pd
 
 # Streamlit UI
 st.title("Business Card Data Extractor using OpenCV and Streamlit")
@@ -135,116 +141,114 @@ if uploaded_file is not None:
     if res2 is not None:
         drawing_image = drawing_detection(res2, image)
 
-        try:
-            output = query({
-                "inputs": res,
-            })
+        output = query({"inputs": res})  # Perform NER
 
+        if output:
             entity_type, named_entities = get_ner_from_transformer(output)
-        except Exception as e:
-            st.error("An error occurred while processing the business card. Please try again later.")
-            st.error(f"Error details: {str(e)}")
 
-        extracted_data = {}
+            if named_entities:
+                extracted_data = {}
 
-        # Function to extract person's name
-        # Assuming the person's name is extracted by NER
-        names = named_entities.get("PER", [])
-        if names:
-            selected_name = st.selectbox("Select Person's Name:", [""] + names)
-            if selected_name:
-                extracted_data["Name"] = selected_name
-            else:
-                manual_name = st.text_input("Enter Person's Name manually:")
-                if manual_name:
-                    extracted_data["Name"] = manual_name
+                # Function to extract person's name
+                # Assuming the person's name is extracted by NER
+                names = named_entities.get("PER", [])
+                if names:
+                    selected_name = st.selectbox("Select Person's Name:", [""] + names)
+                    if selected_name:
+                        extracted_data["Name"] = selected_name
+                    else:
+                        manual_name = st.text_input("Enter Person's Name manually:")
+                        if manual_name:
+                            extracted_data["Name"] = manual_name
 
-        # Function to extract designations
-        designations = extract_designation(res)
-        if designations is not None:
-            selected_designation = st.selectbox("Select Designation:", [""] + designations)
-            if selected_designation:
-                extracted_data["Designation"] = selected_designation
-            else:
-                manual_designation = st.text_input("Enter Designation manually:")
-                if manual_designation:
-                    extracted_data["Designation"] = manual_designation
+                # Function to extract designations
+                designations = extract_designation(res)
+                if designations is not None:
+                    selected_designation = st.selectbox("Select Designation:", [""] + designations)
+                    if selected_designation:
+                        extracted_data["Designation"] = selected_designation
+                    else:
+                        manual_designation = st.text_input("Enter Designation manually:")
+                        if manual_designation:
+                            extracted_data["Designation"] = manual_designation
 
-        # Function to extract company names
-        # Assuming the organization names extracted by NER represent company names
-        company_names = named_entities.get("ORG", [])
-        if company_names:
-            selected_company_name = st.selectbox("Select Company Name:", [""] + company_names)
-            if selected_company_name:
-                extracted_data["Company Name"] = selected_company_name
-            else:
-                manual_company_name = st.text_input("Enter Company Name manually:")
-                if manual_company_name:
-                    extracted_data["Company Name"] = manual_company_name
+                # Function to extract company names
+                # Assuming the organization names extracted by NER represent company names
+                company_names = named_entities.get("ORG", [])
+                if company_names:
+                    selected_company_name = st.selectbox("Select Company Name:", [""] + company_names)
+                    if selected_company_name:
+                        extracted_data["Company Name"] = selected_company_name
+                    else:
+                        manual_company_name = st.text_input("Enter Company Name manually:")
+                        if manual_company_name:
+                            extracted_data["Company Name"] = manual_company_name
 
-        # Function to extract email addresses
-        emails = extract_email(res)
-        if emails is not None:
-            selected_email = st.selectbox("Select Email:", [""] + emails)
-            if selected_email:
-                extracted_data["Email"] = selected_email
-            else:
-                manual_email = st.text_input("Enter Email manually:")
-                if manual_email:
-                    extracted_data["Email"] = manual_email
+                # Function to extract email addresses
+                emails = extract_email(res)
+                if emails is not None:
+                    selected_email = st.selectbox("Select Email:", [""] + emails)
+                    if selected_email:
+                        extracted_data["Email"] = selected_email
+                    else:
+                        manual_email = st.text_input("Enter Email manually:")
+                        if manual_email:
+                            extracted_data["Email"] = manual_email
 
-        # Function to extract website URLs
-        websites = extract_websites(res)
-        if websites is not None:
-            selected_website = st.selectbox("Select Website:", [""] + websites)
-            if selected_website:
-                extracted_data["Website"] = selected_website
-            else:
-                manual_website = st.text_input("Enter Website manually:")
-                if manual_website:
-                    extracted_data["Website"] = manual_website
+                # Function to extract website URLs
+                websites = extract_websites(res)
+                if websites is not None:
+                    selected_website = st.selectbox("Select Website:", [""] + websites)
+                    if selected_website:
+                        extracted_data["Website"] = selected_website
+                    else:
+                        manual_website = st.text_input("Enter Website manually:")
+                        if manual_website:
+                            extracted_data["Website"] = manual_website
 
-        # Function to extract phone numbers
-        phone_numbers = extract_phone_numbers(res)
-        if phone_numbers is not None:
-            selected_phone_number = st.selectbox("Select Phone Number:", [""] + phone_numbers)
-            if selected_phone_number:
-                extracted_data["Phone Number"] = selected_phone_number
-            else:
-                manual_phone_number = st.text_input("Enter Phone Number manually:")
-                if manual_phone_number:
-                    extracted_data["Phone Number"] = manual_phone_number
+                # Function to extract phone numbers
+                phone_numbers = extract_phone_numbers(res)
+                if phone_numbers is not None:
+                    selected_phone_number = st.selectbox("Select Phone Number:", [""] + phone_numbers)
+                    if selected_phone_number:
+                        extracted_data["Phone Number"] = selected_phone_number
+                    else:
+                        manual_phone_number = st.text_input("Enter Phone Number manually:")
+                        if manual_phone_number:
+                            extracted_data["Phone Number"] = manual_phone_number
 
-       # Concatenate all the text returned by the API for location
-        locations = named_entities.get("LOC", [])
-        if locations:
-            concatenated_location = ", ".join(locations)
-            selected_location = st.selectbox("Select Location:", [""] + [concatenated_location])
-            if selected_location:
-                extracted_data["Location"] = selected_location
-            else:
-                manual_location = st.text_input("Enter Location manually:")
-                if manual_location:
-                    extracted_data["Location"] = manual_location
+                # Concatenate all the text returned by the API for location
+                locations = named_entities.get("LOC", [])
+                if locations:
+                    concatenated_location = ", ".join(locations)
+                    selected_location = st.selectbox("Select Location:", [""] + [concatenated_location])
+                    if selected_location:
+                        extracted_data["Location"] = selected_location
+                    else:
+                        manual_location = st.text_input("Enter Location manually:")
+                        if manual_location:
+                            extracted_data["Location"] = manual_location
+                else:
+                    manual_location = st.text_input("Enter Location manually:")
+                    if manual_location:
+                        extracted_data["Location"] = manual_location
+
+
+                # Function to extract PIN codes
+                pin_code = extract_pin_code(res)
+                if pin_code is not None:
+                    selected_pin_code = st.selectbox("Select PIN Code:", ["", pin_code])
+                    if selected_pin_code:
+                        extracted_data["PIN Code"] = selected_pin_code
+                    else:
+                        manual_pin_code = st.text_input("Enter PIN Code manually:")
+                        if manual_pin_code:
+                            extracted_data["PIN Code"] = manual_pin_code
+
+                # Display extracted data
+                if extracted_data:
+                    st.write("Extracted Data:")
+                    df = pd.DataFrame([extracted_data], columns=["Name", "Designation", "Company Name", "Email", "Website", "Phone Number", "Location", "PIN Code"])
+                    st.write(df)
         else:
-            manual_location = st.text_input("Enter Location manually:")
-            if manual_location:
-                extracted_data["Location"] = manual_location
-
-
-        # Function to extract PIN codes
-        pin_code = extract_pin_code(res)
-        if pin_code is not None:
-            selected_pin_code = st.selectbox("Select PIN Code:", ["", pin_code])
-            if selected_pin_code:
-                extracted_data["PIN Code"] = selected_pin_code
-            else:
-                manual_pin_code = st.text_input("Enter PIN Code manually:")
-                if manual_pin_code:
-                    extracted_data["PIN Code"] = manual_pin_code
-
-        # Display extracted data
-        if extracted_data:
-            st.write("Extracted Data:")
-            df = pd.DataFrame([extracted_data], columns=["Name", "Designation", "Company Name", "Email", "Website", "Phone Number", "Location", "PIN Code"])
-            st.write(df)
+            st.error("Failed to detect named entities. Please try again later.")
