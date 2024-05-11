@@ -145,7 +145,7 @@ if uploaded_file is not None:
         st.write(output) # for testing purpose
 
         if output:
-            entity_type, named_entities = get_ner_from_transformer(output)
+            named_entities = get_ner_from_transformer(output)
 
             if named_entities:
                 extracted_data = {}
